@@ -71,10 +71,11 @@ const Donor = sequelize.define("donor",{
     shabaNumber:{type:DataTypes.STRING},
     isActive:{type:DataTypes.BOOLEAN},
     isDeleted:{type:DataTypes.BOOLEAN},
-    donorPhotoPath:{type:DataTypes.STRING}
+    donorPhotoPath:{type:DataTypes.STRING},
+    lastDonationDate:{type:DataTypes.DATEONLY}
 
 },{})
 
-Donor.hasMany(Donation,{foreignKey:"nationalNumber"})
+Donor.hasMany(Donation,{foreignKey:"donorNationalNumber"})
 Donation.belongsTo(Donor)
 module.exports={sequelize,Donation,Donor,QueryTypes}

@@ -10,6 +10,10 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@persian-tools/persian-tools": "^3.5.2",
+    "axios": "^1.7.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-fileupload": "^1.5.1",
     "fs-extra": "^11.2.0",

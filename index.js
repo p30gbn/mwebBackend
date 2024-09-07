@@ -1,6 +1,6 @@
 const express = require("express");
 const fs = require("fs-extra");
-const { Sequelize, Model } = require("sequelize");
+const { Sequelize, Model, DOUBLE } = require("sequelize");
 const port = 3000;
 const app = express();
 const path = require("path")
@@ -9,21 +9,28 @@ const { error } = require("console");
 const { sequelize, Donation, Donor,QueryTypes } = require("./database")
 const moment = require("jalali-moment");
 const underscore = require("underscore");
-
+const axios = require("axios")
 const util = require("util");
-const { singularize } = require("sequelize/lib/utils");
+const { singularize, underscoredIf } = require("sequelize/lib/utils");
+const {searchDonorNationalNumberRouter} = require("./routes/searchDonorNationalNumber")
+const {toPersianChars} = require("@persian-tools/persian-tools")
+const cors=require("cors");
+const corsOptions ={
+   origin:'*', 
+   credentials:true,            //access-control-allow-credentials:true
+   optionSuccessStatus:200,
+}
 
 
 
-
-
+app.use(cors(corsOptions)) // Use this after the variable declaration
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json({ limit: "100mb" }));
 app.use(path.join(__dirname, "public"), express.static("public"));
 app.use(fileUpload())
 
 
-
+app.use('/searchDonorNationalNumber',searchDonorNationalNumberRouter)
 app.post("/uploadxlsx", (req, res) => {
 
     const dataProcess = async () => {
@@ -252,16 +259,36 @@ app.post("/getdonationsfromfile", async (req, res) => {
     fileDataa.forEach((data) => {
         checkDataIsNotExistInDatabase.forEach((differ) => {
             if (data.donationNumber === differ) {
-                if(data.donationDate){data.donationDate = moment(data.donationDate)}
-                if(data.physicalExamDate){data.physicalExamDate = moment(data.physicalExamDate)}
-                if(data.paymentDate){data.paymentDate = moment(data.paymentDate)}
-                data.medicalDoctorRequestedVolume = Number(data.medicalDoctorRequestedVolume)
-                data.plasmaVolume = Number(data.plasmaVolume)
-                data.ageWhenDonated = Number(data.ageWhenDonated)
-                data.price = Number(data.price)
-                data.bonus = Number(data.bonus)
-                data.pricePlusBonus = Number(data.pricePlusBonus)
-                donationsArr.push(data)
+                let newData={}
+                if(data.donationDate){newData.donationDate = moment(data.donationDate,"jYYYY/jMM/jDD").format("YYYY/MM/DD")}else{newData.donationDate=null}
+                if(data.physicalExamDate){newData.physicalExamDate = moment(data.physicalExamDate,"jYYYY/jMM/jDD").format("YYYY/MM/DD")}else{newData.physicalExamDate=null}
+                if(data.paymentDate){newData.paymentDate = moment(data.paymentDate,"jYYYY/jMM/jDD").format("YYYY/MM/DD")}else{newData.paymentDate=null}
+                if(data.medicalDoctorRequestedVolume){newData.medicalDoctorRequestedVolume = Number(data.medicalDoctorRequestedVolume)}  
+                if(data.plasmaVolume){newData.plasmaVolume=Number(data.plasmaVolume.replaceAll("/","."))}else{newData.plasmaVolume=0}
+                if(data.ageWhenDonated){ newData.ageWhenDonated = Number(data.ageWhenDonated)}else{newData.ageWhenDonated=null}
+                if(data.price){ newData.price =  Number(data.price)}else{ newData.price=null}
+                if(data.bonus){newData.bonus =  Number(data.bonus)}else{ newData.bonus=null}
+                if(data.pricePlusBonus){ newData.pricePlusBonus = Number(data.pricePlusBonus)}else{ newData.pricePlusBonus=null}
+                if(data.donationLocation){newData.donationLocation = data.donationLocation}else{ newData.donationLocation=null}
+                if(data.countyCode){newData.countyCode = data.countyCode}else{ newData.countyCode=null}
+                if(data.databaseCode){newData.databaseCode = data.databaseCode}else{ newData.databaseCode=null}
+                if(data.donationNumber){newData.donationNumber = data.donationNumber}else{ newData.donationNumber=null}
+                if(data.receptionTime){newData.receptionTime = data.receptionTime}else{ newData.receptionTime=null}
+                if(data.receptionStaff){newData.receptionStaff = data.receptionStaff}else{ newData.receptionStaff=null}
+                if(data.medicalDoctor){newData.medicalDoctor = data.medicalDoctor}else{ newData.medicalDoctor=null}
+                if(data.physicalExamResult){newData.physicalExamResult = data.physicalExamResult}else{ newData.physicalExamResult=null}
+                if(data.physicalExamTime){newData.physicalExamTime = data.physicalExamTime}else{ newData.physicalExamTime=null}
+                if(data.donationStartingTime){newData.donationStartingTime = data.donationStartingTime}else{ newData.donationStartingTime=null}
+                if(data.donationEndingTime){newData.donationEndingTime = data.donationEndingTime}else{ newData.donationEndingTime=null}
+                if(data.donationNurse){newData.donationNurse = data.donationNurse}else{ newData.donationNurse=null}
+                if(data.donationResult){newData.donationResult = data.donationResult}else{ newData.donationResult=null}
+                if(data.selfAdmission){newData.selfAdmission = data.selfAdmission}else{ newData.selfAdmission=null}
+                if(data.paymentMethod){newData.paymentMethod = data.paymentMethod}else{ newData.paymentMethod=null}
+                if(data.deedNumber){newData.deedNumber = data.deedNumber}else{ newData.deedNumber=null}
+                if(data.fdoId){newData.fdoId = data.fdoId}else{ newData.fdoId=null}
+                if(data.uids){newData.uids = data.uids}else{ newData.uids=null}
+                if(data.donorNationalNumber){newData.donorNationalNumber = data.donorNationalNumber}else{ newData.donorNationalNumber=null}
+                donationsArr.push(newData)
             }
 
         });
@@ -281,7 +308,7 @@ app.get("/invitationDonor", async (req, res) => {
     const today = moment()
     const firstRedonationtimeForDonors = moment().subtract(8, "days")
     const lastRedonationtimeForDonors = moment().subtract(5, "months")
-    console.log("today: " + today.format("YYYY/MM/DD") + "\nfirst redonation time: " + firstRedonationtimeForDonors.format("YYYY/MM/DD") + "\nlast redonation time: " + lastRedonationtimeForDonors.format("YYYY/MM/DD"))
+    //console.log("today: " + today.format("YYYY/MM/DD") + "\nfirst redonation time: " + firstRedonationtimeForDonors.format("YYYY/MM/DD") + "\nlast redonation time: " + lastRedonationtimeForDonors.format("YYYY/MM/DD"))
 
     await sequelize.sync()
     // let rows = await Donor.findAll({include:
@@ -300,10 +327,85 @@ app.get("/invitationDonor", async (req, res) => {
     //         }
     //     ]})
 
-    let rows = await sequelize.query(`SELECT * FROM donors INNER JOIN donations ON donors.nationalNumber = donations.donorNationalNumber WHERE donationDate <= DATE('${firstRedonationtimeForDonors.format("YYYY-MM-DD")}') AND donationDate >= DATE('${lastRedonationtimeForDonors.format("YYYY-MM-DD")}') ORDER BY donationDate DESC`)
+    let rows = await sequelize.query(`SELECT firstName,lastName,donors.nationalNumber,birthday,donationsCount,donationDate,donationResult,mobilePhoneNumber FROM donors INNER JOIN donations ON donors.nationalNumber = donations.donorNationalNumber WHERE donationDate <= DATE('${firstRedonationtimeForDonors.format("YYYY-MM-DD")}') AND donationDate >= DATE('${lastRedonationtimeForDonors.format("YYYY-MM-DD")}') ORDER BY donationDate DESC`)
+    let seccondRows = await sequelize.query(`SELECT firstName,lastName,donors.nationalNumber,birthday,donationsCount,donationDate,donationResult,mobilePhoneNumber FROM donors INNER JOIN donations ON donors.nationalNumber = donations.donorNationalNumber WHERE donationDate <= DATE('${today.format("YYYY-MM-DD")}') AND donationDate >= DATE('${firstRedonationtimeForDonors.format("YYYY-MM-DD")}') ORDER BY donationDate DESC`)
+    seccondRows =  underscore.flatten(seccondRows,1)
+    rows = underscore.flatten(rows,1)
 
-        console.log(rows)
-        res.json(rows)
+    let seccondRowsMap=seccondRows.map((row)=>{return row.nationalNumber})
+    let rowsMap=rows.map((row)=>{return row.nationalNumber})
+    let differenceRowsAndSeccondRows = underscore.difference(rowsMap,seccondRowsMap)
+
+    differenceRowsAndSeccondRows = underscore.uniq(differenceRowsAndSeccondRows)
+    console.log(differenceRowsAndSeccondRows.length)
+
+    let addAgeAndconvertedDate = []
+    let uniqueNationalNumbers = []
+    rows.forEach((row)=>{
+        differenceRowsAndSeccondRows.forEach((differ)=>{
+            if(row.nationalNumber===differ && !underscore.contains(uniqueNationalNumbers,row.nationalNumber)){
+                if(row.donationResult !== "-"){
+
+                    if(row.birthday){
+                        let birthday = moment(row.birthday,"jYYYY-jMM-jDD")
+                        birthday = birthday.locale("en")
+                        console.log(moment())
+
+                        let age = moment().diff(birthday,"years")
+                        row['age'] = age
+                        console.log(age)
+                    }
+
+                    if(row.donationDate){let m = moment(row.donationDate)
+                        m.locale("fa")
+                        row['shamsiLastDonationDate'] = m.format("YYYY/MM/DD")
+                    }
+
+                    let dataObject = {firstName:toPersianChars(row.firstName),
+                        lastName:toPersianChars(row.lastName),nationalNumber:row.nationalNumber,donationsCount:row.donationsCount,donationDate:row['shamsiLastDonationDate'],
+                        donationResult:toPersianChars(row.donationResult),mobilePhoneNumber:row.mobilePhoneNumber
+        
+                    }
+
+                    if(row.age){
+                        dataObject["age"]=row.age}else{dataObject["age"]=" "
+                    }
+
+                    if(row.mobilePhoneNumber){
+                        dataObject["mobilePhoneNumber"]=row.mobilePhoneNumber}else{dataObject["mobilePhoneNumber"]=" "
+                    }
+
+                uniqueNationalNumbers.push(row.nationalNumber)
+                addAgeAndconvertedDate.push(dataObject)
+
+                }
+                
+
+                
+
+                
+
+                
+
+                
+                
+
+
+            }
+        })
+
+        
+        
+       
+           
+            
+
+            
+       
+    })
+        //console.log(addAgeAndconvertedDate)
+
+        res.json({data:addAgeAndconvertedDate})
 
 
 
@@ -320,6 +422,127 @@ app.post("/getinvitationsfromfile", async (req, res) => {
     })
 
 })
+
+
+app.post("/sendsms",(req,res)=>{
+    const smsData = req.body
+    //console.log(smsData)
+    let now = moment()
+    now.locale("fa")
+    let month = now.format("MMMM")
+    let weekDayName = now.format("ddd")
+    let year = now.format("YYYY")
+    let dayOfMonth = now.format("D")
+    let today = weekDayName+" ،  "+dayOfMonth+" "+month+" "+year
+
+
+    console.log(today)
+
+
+
+
+
+    const smsText = `  عزیز سلام
+نوبت بعدی اهدای پلاسما شما فرارسیده است و می توانید امروز ${today} جهت اهدا به مرکز اهدا پلاسما یزد مراجعه فرمایید.
+اهـــــــدا پلاســـــــما ، اهـــــــدا زندگـــــــی
+مرکز اهدا پلاسما یزد`
+
+const sendSMS = (op,uname,pass,message,from,to) => {
+    axios.post('http://ippanel.com/api/select',{
+        op:op,
+       uname:uname,
+       pass:pass,
+       message:message,
+       from:from,
+       to:to
+    },{headers:{
+       "Content-Type":"application/json"
+    }}).then((result)=>{
+       console.log(result)
+    }).catch((error)=>{console.error(error);})
+ 
+ }
+
+    let op = "send"
+   let uname = "u09101513747"
+   let pass = "@Yekta3899"
+   let from = "3000505"
+   const donorsSmsData = []
+   smsData.forEach((donor)=>{
+        console.log(donor)
+    let donorName = donor["firstName"]+" "+donor["lastName"]
+    console.log(donorName)
+    donorsSmsData.push({donorName:donorName,mobilePhoneNumber:donor["mobilePhoneNumber"]})
+   })
+
+   const sendSmsInterval = setInterval(()=>{
+        let selectedDonor = donorsSmsData[donorsSmsData.length-1]
+        let message = selectedDonor.donorName + smsText
+        let to = String(selectedDonor.mobilePhoneNumber)
+        sendSMS(op,uname,pass,message,from,to)
+        donorsSmsData.pop()
+        if ( donorsSmsData.length<1){
+            process.stdout.write('\x1Bc')
+            process.stdout.write("\u001b[2J\u001b[0;0H");
+            console.log("send sms course in finished!!")
+            clearInterval(sendSmsInterval)
+        }
+
+   },1000*10)
+
+
+
+
+
+
+
+})
+
+
+
+app.get("/temp",async(req,res)=>{
+    let rows = await sequelize.query(`SELECT nationalNumber FROM donors`)
+    //rows = underscore.flatten(rows)
+    const donationUpdateArray=[]
+    const finalDonationUpdateArray=[]
+    rows[0].forEach((row)=>{
+        donationUpdateArray.push({nationalNumber:row.nationalNumber})
+    })
+    console.log(donationUpdateArray)
+    donationUpdateArray.forEach(async(elment)=>{
+        let result = await sequelize.query(`SELECT donorNationalNumber,donationDate FROM donations WHERE donorNationalNumber="${elment.nationalNumber}" ORDER BY donationDate DESC`)
+        result[0].forEach((item)=>{
+            console.log(item)
+            finalDonationUpdateArray.push(item)
+
+        })
+        finalDonationUpdateArray.forEach(async(singleRow)=>{
+            let updatingResult = await sequelize.query(`UPDATE donors SET lastDonationDate=DATE("${moment(singleRow.donationDate)}") WHERE nationalNumber="${singleRow.donorNationalNumber}"`)
+            console.log(updatingResult) 
+        })
+//         //let updateRecord = await sequelize.query(`UPDATE donors SET lastDonationDate="${result[0]}" WHERE donors.nationalNumber="${row.nationalNumber}"`)
+//         //console.log(updateRecord)
+//         donationUpdateArray.push(result)
+    })
+   
+// console.log(donationUpdateArray)
+console.log(rows[0][6])
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
